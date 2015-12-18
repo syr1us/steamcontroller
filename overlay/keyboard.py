@@ -28,12 +28,63 @@ class Recources(object):
         self.left_hand = ImageTk.PhotoImage(self._left_hand)
         self.right_hand = ImageTk.PhotoImage(self._right_hand)
 
+def set_classic_buttons(evm):
+    evm.setPadMouse(Pos.RIGHT)
+    evm.setPadScroll(Pos.LEFT)
+    evm.setStickButtons(
+        [Keys.KEY_UP, Keys.KEY_LEFT, Keys.KEY_DOWN, Keys.KEY_RIGHT]
+    )
+    evm.setTrigButton(Pos.LEFT, Keys.BTN_RIGHT)
+    evm.setTrigButton(Pos.RIGHT, Keys.BTN_LEFT)
+    evm.setButtonAction(SCButtons.LB, Keys.KEY_VOLUMEDOWN)
+    evm.setButtonAction(SCButtons.RB, Keys.KEY_VOLUMEUP)
+    evm.setButtonAction(SCButtons.A, Keys.KEY_ENTER)
+    evm.setButtonAction(SCButtons.B, Keys.KEY_BACKSPACE)
+    evm.setButtonAction(SCButtons.X, Keys.KEY_ESC)
+    evm.setButtonAction(SCButtons.Y, Keys.KEY_PLAYPAUSE)
+    evm.setButtonAction(SCButtons.START, Keys.KEY_NEXTSONG)
+    evm.setButtonAction(SCButtons.BACK, Keys.KEY_PREVIOUSSONG)
+    evm.setButtonAction(SCButtons.LGRIP, Keys.KEY_BACK)
+    evm.setButtonAction(SCButtons.RGRIP, Keys.KEY_FORWARD)
+    evm.setButtonAction(SCButtons.LPAD, Keys.BTN_MIDDLE)
+    evm.setButtonAction(SCButtons.RPAD, Keys.KEY_SPACE)
+
+def unset_button_map(evm, button):
+    if button in evm._btn_map.keys():
+        del evm._btn_map[button]
+
+def unset_trigger_map(evm, pos):
+    evm._trig_evts[pos] = (None, 0)
+
+
+def set_overlay_buttons(evm):
+    evm.setPadButtonCallback(Pos.RIGHT, pad_move)
+    evm.setPadButtonCallback(Pos.LEFT, pad_move)
+    evm.setButtonCallback(SCButtons.LT, tigger_pressed)
+    evm.setButtonCallback(SCButtons.RT, tigger_pressed)
+    unset_trigger_map(evm, Pos.LEFT)
+    unset_trigger_map(evm, Pos.RIGHT)
+    unset_button_map(evm, SCButtons.LB)
+    unset_button_map(evm, SCButtons.RB)
+    unset_button_map(evm, SCButtons.A)
+    unset_button_map(evm, SCButtons.B)
+    unset_button_map(evm, SCButtons.X)
+    unset_button_map(evm, SCButtons.Y)
+    unset_button_map(evm, SCButtons.START)
+    unset_button_map(evm, SCButtons.BACK)
+    unset_button_map(evm, SCButtons.LGRIP)
+    unset_button_map(evm, SCButtons.RGRIP)
+    unset_button_map(evm,SCButtons.LPAD)
+    unset_button_map(evm, SCButtons.RPAD)
+
 def button_pressed_callback(evm, button, pressed):
     if not pressed:
         if evm.visible:
+            set_classic_buttons(evm)
             evm.tk.withdraw()
             evm.visible = False
         else:
+            set_overlay_buttons(evm)
             evm.tk.update()
             evm.tk.deiconify()
             evm.visible = True
@@ -81,10 +132,7 @@ class SCDaemon(Daemon):
 def contollerloop(tk):
     evm = GuiEventMapper(tk)
     evm.setButtonCallback(SCButtons.STEAM, button_pressed_callback)
-    evm.setPadButtonCallback(Pos.RIGHT, pad_move)
-    evm.setPadButtonCallback(Pos.LEFT, pad_move)
-    evm.setButtonCallback(SCButtons.LT, tigger_pressed)
-    evm.setButtonCallback(SCButtons.RT, tigger_pressed)
+    set_classic_buttons(evm)
     sc = SteamController(callback=evm.process)
     sc.run()
 
