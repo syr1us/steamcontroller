@@ -63,6 +63,7 @@ KEYS_MAPPING =  {
         u',': Keys.KEY_COMMA,
         u'.': Keys.KEY_DOT,
         u'-': Keys.KEY_SLASH,
+        u' ': Keys.KEY_SPACE,
     }
 
 
@@ -141,14 +142,12 @@ class GuiEventMapper(EventMapper):
     @staticmethod
     def insert_whitespace(self, button, pressed):
         if pressed:
-            pass#self.tk.winfo_children()[0].insert('end', ' ')
+            self.events.enqueue('<<whitespace>>')
 
     @staticmethod
     def remove_char(self, button, pressed):
         if pressed:
-            pass
-            #output = self.tk.winfo_children()[0]
-            #output.delete(len(output.get())-1, 'end')
+            self.events.enqueue('<<backspace>>')
 
     @staticmethod
     def button_pressed_callback(self, button, pressed):
@@ -258,27 +257,17 @@ class TkSteamController(SteamController):
         
         def generate_output(self, press=True):
             if press:
-                old_content = self.tk.clipboard_get()
-                self.tk.clipboard_clear()
-                string = self.tk.winfo_children()[0].get()
-                
-                self.tk.clipboard_append(string)
+                self.__press_output_key(self.tk.winfo_children()[0].get())
+        
+        def __press_output_key(self, chars):
+            if chars:
                 keyboard = self.evm._uip[1]
-                keyboard.pressEvent([Keys.KEY_LEFTCTRL])
-                keyboard.pressEvent([Keys.KEY_V])
-                keyboard.releaseEvent([Keys.KEY_LEFTCTRL])
-                keyboard.releaseEvent([Keys.KEY_V])
-                print  self.tk.clipboard_get()
-                #for char in string:
-                    #if char in KEYS_MAPPING.keys():
-                        #if press:
-                            #keyboard.pressEvent([KEYS_MAPPING[char]])
-                        #else:
-                            #keyboard.releaseEvent([KEYS_MAPPING[char]])
-                self.tk.clipboard_clear()
-                self.tk.clipboard_append(old_content)
-            #if press:
-                #self.tk.after(100, self.generate_output, False)
+                char = chars[0]
+                keyboard.pressEvent([KEYS_MAPPING[char]])
+                keyboard.releaseEvent([KEYS_MAPPING[char]])
+                if len(chars) > 1:
+                    chars = chars[1:]
+                    self.tk.after(10, self.__press_output_key, chars)
         
         def build_keyboard(self, res):
             font = tkFont.Font(family='Helvetica', size=24, weight='bold')
@@ -299,6 +288,8 @@ class TkSteamController(SteamController):
             self.tk.bind('<<GuiHide>>', self.guiHide)
             self.tk.bind('<<GuiShow>>', self.guiShow)
             self.tk.bind('<<SteamPadMove>>', self.padMove)
+            self.tk.bind('<<whitespace>>', self.whitespace)
+            self.tk.bind('<<backspace>>', self.backspace)
         
         def triggerPressed(self, evt):
             tk_index = 2 if evt.serial % 2 else 3
@@ -336,6 +327,13 @@ class TkSteamController(SteamController):
             pad_index = 1 if pad == Pos.RIGHT else 2
             label = self.tk.winfo_children()[pad_index+1]
             label.place(x=x, y=y)
+        
+        def whitespace(self, evt):
+            self.tk.winfo_children()[0].insert('end', ' ')
+            
+        def backspace(self, evt):
+            output = self.tk.winfo_children()[0]
+            output.delete(len(output.get())-1, 'end')
 
 class SCDaemon(Daemon):
     def run(self):
