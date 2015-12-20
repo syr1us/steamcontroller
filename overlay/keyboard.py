@@ -207,7 +207,8 @@ class GuiEventMapper(EventMapper):
         self.unset_button_map(SCButtons.RPAD)
 
 class TkSteamController(SteamController):
-        def __init__(self, events, tk, **kwargs):
+        def __init__(self, evm, events, tk, **kwargs):
+            self.evm = evm
             self.tk = tk
             self.quit = False
             self.events = events
@@ -256,40 +257,38 @@ class TkSteamController(SteamController):
                     pass
         
         def generate_output(self, press=True):
-            pass
-            #old_content = self.tk.clipboard_get()
-            #self.tk.clipboard_clear()
-            #string = self.tk.winfo_children()[0].get()
-            #self.tk.clipboard_append(string)
-            #keyboard = self._uip[1]
-            #for char in string:
-                #if char in KEYS_MAPPING.keys():
-                    #if press:
-                        #keyboard.pressEvent([KEYS_MAPPING[char]])
-                    #else:
-                        #keyboard.releaseEvent([KEYS_MAPPING[char]])
-            #self.tk.clipboard_clear()
-            #self.tk.clipboard_append(old_content)
+            if press:
+                old_content = self.tk.clipboard_get()
+                self.tk.clipboard_clear()
+                string = self.tk.winfo_children()[0].get()
+                
+                self.tk.clipboard_append(string)
+                keyboard = self.evm._uip[1]
+                keyboard.pressEvent([Keys.KEY_LEFTCTRL])
+                keyboard.pressEvent([Keys.KEY_V])
+                keyboard.releaseEvent([Keys.KEY_LEFTCTRL])
+                keyboard.releaseEvent([Keys.KEY_V])
+                print  self.tk.clipboard_get()
+                #for char in string:
+                    #if char in KEYS_MAPPING.keys():
+                        #if press:
+                            #keyboard.pressEvent([KEYS_MAPPING[char]])
+                        #else:
+                            #keyboard.releaseEvent([KEYS_MAPPING[char]])
+                self.tk.clipboard_clear()
+                self.tk.clipboard_append(old_content)
             #if press:
                 #self.tk.after(100, self.generate_output, False)
-            #print keyboard._pressed
         
         def build_keyboard(self, res):
-            output = Tkinter.Entry(self.tk, width=100)
+            font = tkFont.Font(family='Helvetica', size=24, weight='bold')
+            output = Tkinter.Entry(self.tk, width=50, font=font)
             output.pack()
             lf = Tkinter.LabelFrame(self.tk, text=" keypad ", bd=3)
             lf.pack(padx=15, pady=15)
-            helv36 = tkFont.Font(family='Helvetica', size=24, weight='bold')
             for row_nr, row in enumerate(KEYS):
                 for key_nr, key in enumerate(row):
-                    key = Tkinter.Button(
-                        lf,
-                        text=key,
-                        width=5,
-                        height=5,
-                        font=helv36,
-                        #command=functools.partial(virtualKeyPress, key)
-                    )
+                    key = Tkinter.Button(lf, text=key, font=font)
                     key.grid(row=row_nr, column=key_nr)
             right = Tkinter.Label(self.tk, image=res.right_hand)
             right.pack()
@@ -383,7 +382,7 @@ if __name__ == '__main__':
             res = Recources()
             #build_keyboard(tk, res)
             evm = GuiEventMapper(events)
-            sc = TkSteamController(events, tk, callback=evm.process)
+            sc = TkSteamController(evm, events, tk, callback=evm.process)
             sc.build_keyboard(res)
             sc.run()
             #tk.mainloop()
