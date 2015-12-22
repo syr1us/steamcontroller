@@ -89,12 +89,12 @@ class EventQueue(object):
     def __init__(self):
         self._lock = threading.Lock()
         self.events = []
-    
+
     def enqueue(self, event, data={}):
         self._lock.acquire()
         self.events.append([event, data])
         self._lock.release()
-    
+
     def dequeue(self):
         self._lock.acquire()
         if not self.events:
@@ -113,7 +113,7 @@ class GuiEventMapper(EventMapper):
         self.events = events
         self.setButtonCallback(SCButtons.STEAM, self.button_pressed_callback)
         self.set_classic_buttons()
-        
+
 
     def unset_button_map(self, button):
         if button in self._btn_map.keys():
@@ -176,7 +176,7 @@ class GuiEventMapper(EventMapper):
         self.setButtonAction(SCButtons.B, Keys.KEY_BACKSPACE)
         self.setButtonAction(SCButtons.X, Keys.KEY_ESC)
         self.setButtonAction(SCButtons.Y, Keys.KEY_PLAYPAUSE)
-        
+
         self.setButtonAction(SCButtons.START, Keys.KEY_NEXTSONG)
         self.setButtonAction(SCButtons.BACK, Keys.KEY_PREVIOUSSONG)
         self.setButtonAction(SCButtons.LGRIP, Keys.KEY_BACK)
@@ -184,7 +184,7 @@ class GuiEventMapper(EventMapper):
         self.setButtonAction(SCButtons.LPAD, Keys.BTN_MIDDLE)
         self.setButtonAction(SCButtons.RPAD, Keys.KEY_SPACE)
 
-    
+
     def set_overlay_buttons(self):
         self.setPadButtonCallback(Pos.RIGHT, self.pad_move)
         self.setPadButtonCallback(Pos.LEFT, self.pad_move)
@@ -214,7 +214,7 @@ class TkSteamController(SteamController):
             self.visible = False
             super(TkSteamController, self).__init__(**kwargs)
 
-        
+
         def _callbackTimer(self, *args, **kwargs):
             if not self.quit:
                 super(TkSteamController, self)._callbackTimer(*args, **kwargs)
@@ -232,7 +232,7 @@ class TkSteamController(SteamController):
                 self.tk.event_generate(event[0], **event[1])
                 event = self.events.dequeue()
 
-        
+
         def run(self):
             """Fucntion to run in order to process usb events"""
             if self._handle:
@@ -254,11 +254,11 @@ class TkSteamController(SteamController):
 
                 except usb1.USBErrorInterrupted:
                     pass
-        
+
         def generate_output(self, press=True):
             if press:
                 self.__press_output_key(self.tk.winfo_children()[0].get())
-        
+
         def __press_output_key(self, chars):
             if chars:
                 keyboard = self.evm._uip[1]
@@ -268,16 +268,22 @@ class TkSteamController(SteamController):
                 if len(chars) > 1:
                     chars = chars[1:]
                     self.tk.after(10, self.__press_output_key, chars)
-        
+
         def build_keyboard(self, res):
             font = tkFont.Font(family='Helvetica', size=24, weight='bold')
-            output = Tkinter.Entry(self.tk, width=50, font=font)
+            output = Tkinter.Entry(self.tk, width=50, font=font, bg="yellow")
             output.pack()
-            lf = Tkinter.LabelFrame(self.tk, text=" keypad ", bd=3)
+            lf = Tkinter.LabelFrame(self.tk, text=" keypad ", bd=3, bg="green",)
             lf.pack(padx=15, pady=15)
             for row_nr, row in enumerate(KEYS):
                 for key_nr, key in enumerate(row):
-                    key = Tkinter.Button(lf, text=key, font=font)
+                    key = Tkinter.Button(
+                        lf,
+                        text=key,
+                        font=font,
+                        bg="blue",
+                        relief='groove'
+                    )
                     key.grid(row=row_nr, column=key_nr)
             right = Tkinter.Label(self.tk, image=res.right_hand)
             right.pack()
@@ -290,7 +296,7 @@ class TkSteamController(SteamController):
             self.tk.bind('<<SteamPadMove>>', self.padMove)
             self.tk.bind('<<whitespace>>', self.whitespace)
             self.tk.bind('<<backspace>>', self.backspace)
-        
+
         def triggerPressed(self, evt):
             tk_index = 2 if evt.serial % 2 else 3
             label = self.tk.winfo_children()[tk_index]
@@ -302,21 +308,21 @@ class TkSteamController(SteamController):
             button = _get_widget_by_pos(lf, x, y, offset)
             if button:
                 if pressed:
-                    button.config(relief='raised')
+                    button.config(relief='groove')
                     output = self.tk.winfo_children()[0]
                     output.insert('end', button.config('text')[4])
                 else:
-                    button.config(relief='sunken')
+                    button.config(relief='ridge')
 
         def guiHide(self, evt):
             self.tk.withdraw()
             self.generate_output()
-        
+
         def guiShow(self, evt):
             self.tk.winfo_children()[0].delete(0, 'end')
             self.tk.update()
             self.tk.deiconify()
-        
+
         def padMove(self, evt):
             x = evt.x_root
             y = evt.y_root
@@ -327,10 +333,10 @@ class TkSteamController(SteamController):
             pad_index = 1 if pad == Pos.RIGHT else 2
             label = self.tk.winfo_children()[pad_index+1]
             label.place(x=x, y=y)
-        
+
         def whitespace(self, evt):
             self.tk.winfo_children()[0].insert('end', ' ')
-            
+
         def backspace(self, evt):
             output = self.tk.winfo_children()[0]
             output.delete(len(output.get())-1, 'end')
@@ -377,6 +383,7 @@ if __name__ == '__main__':
             events = EventQueue()
             tk = Tkinter.Tk()
             tk.overrideredirect(1)
+            tk.configure(background = 'red')
             res = Recources()
             #build_keyboard(tk, res)
             evm = GuiEventMapper(events)
