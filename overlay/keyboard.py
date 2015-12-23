@@ -7,6 +7,7 @@ import functools
 import os
 import sys
 import threading
+import datetime
 
 from steamcontroller import SteamController, SCButtons
 from steamcontroller.events import EventMapper, Pos
@@ -208,6 +209,7 @@ class GuiEventMapper(EventMapper):
 class TkSteamController(SteamController):
         WIDTH = 800
         HEIGHT = 300
+        SCALE = 0.01
         
         def __init__(self, evm, events, **kwargs):
             self.evm = evm
@@ -220,7 +222,8 @@ class TkSteamController(SteamController):
             self.visible = False
             super(TkSteamController, self).__init__(**kwargs)
             self.build_keyboard()
-
+            self.last_left = [datetime.datetime.now(), None, None]
+            self.last_right = [datetime.datetime.now(), None, None]
 
         def _callbackTimer(self, *args, **kwargs):
             if not self.quit:
@@ -235,7 +238,6 @@ class TkSteamController(SteamController):
         def handle_tk_events(self):
             event = self.events.dequeue()
             while event is not None:
-                sys.stdout.flush()
                 self.tk.event_generate(event[0], **event[1])
                 event = self.events.dequeue()
 
@@ -282,12 +284,10 @@ class TkSteamController(SteamController):
 
         def build_keyboard(self):
             font = tkFont.Font(family='Helvetica', size=24, weight='bold')
-            output = Tkinter.Entry(self.tk, width=50, font=font, bg="AntiqueWhite3")
-            output.pack()
-            frame = Tkinter.Frame(self.tk)
-            frame.pack()
+            self.output = Tkinter.Entry(self.tk, width=50, font=font, bg="AntiqueWhite3")
+            self.output.pack()
             self.canvas = Tkinter.Canvas(
-                frame,
+                self.tk,
                 bg="AntiqueWhite3",
                 width=self.WIDTH - 80,
                 height=self.HEIGHT - 30
@@ -301,14 +301,14 @@ class TkSteamController(SteamController):
                         text = key
                     )
             self.left_hand = self.canvas.create_image(
-                150,
-                250,
+                (self.WIDTH - 80) / 2 - 50,
+                (self.HEIGHT - 30) / 2,
                 image=self.res.left_hand,
                 tags='left_hand'
             )
             self.right_hand = self.canvas.create_image(
-                150,
-                250,
+                (self.WIDTH - 80) / 2 + 50,
+                (self.HEIGHT - 30) / 2,
                 image=self.res.right_hand,
                 tags='right_hand'
             )
@@ -335,8 +335,7 @@ class TkSteamController(SteamController):
             for item in items:
                 tags = self.canvas.gettags(item)
                 if 'button' in tags:
-                    output = self.tk.winfo_children()[0]
-                    output.insert('end', tags[1])
+                    self.output.insert('end', tags[1])
                     break
 
         def guiHide(self, evt):
@@ -349,18 +348,32 @@ class TkSteamController(SteamController):
             self.tk.deiconify()
 
         def padMove(self, evt):
-            x = evt.x_root
-            y = evt.y_root
-            pad = Pos.RIGHT if evt.serial == 1 else Pos.LEFT
-            PAD_MAX = 30000
-            x = ((x + PAD_MAX) / 60000.) * self.tk.winfo_width()
-            y = (1-(y + PAD_MAX) / 60000.) * self.tk.winfo_height()
-            canvas_x = self.canvas.canvasx(x)
-            canvas_y = self.canvas.canvasx(y)
-            if pad == Pos.LEFT:
-                self.canvas.coords(self.left_hand, canvas_x, canvas_y)
+            timestamp = datetime.datetime.now()
+            if evt.serial == 1:
+                # RIGHT pad
+                last = self.last_right
+                hand = self.right_hand
             else:
-                self.canvas.coords(self.right_hand, canvas_x, canvas_y)
+                last = self.last_left
+                hand = self.left_hand
+            to_late = (timestamp - last[0] > datetime.timedelta(seconds=0.1))
+            if to_late or not last[1] or not last[2]:
+                last[0] = timestamp
+                last[1] = evt.x_root
+                last[2] = evt.y_root
+                return
+            delta_x = self.canvas.canvasx(evt.x_root - last[1]) * self.SCALE
+            delta_y = self.canvas.canvasy(last[2] - evt.y_root) * self.SCALE
+            last[0] = timestamp
+            last[1] = evt.x_root
+            last[2] = evt.y_root
+            max_x = int(self.canvas.config()['width'][4])
+            max_y = int(self.canvas.config()['height'][4])
+            old_x, old_y = self.canvas.coords(hand)
+            x = max(min(old_x + delta_x, max_x), 0)
+            y = max(min(old_y + delta_y, max_y), 0)
+            self.canvas.coords(hand, x, y)
+
 
         def whitespace(self, evt):
             self.tk.winfo_children()[0].insert('end', ' ')
