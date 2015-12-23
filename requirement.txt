@@ -1,3 +1,2 @@
 libusb1
 enum34
-Pillow

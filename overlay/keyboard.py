@@ -3,7 +3,6 @@
 import usb1
 import Tkinter
 import tkFont
-from PIL import Image, ImageTk
 import functools
 import os
 import sys
@@ -75,14 +74,15 @@ KEYS = [
 class Recources(object):
     def __init__(self):
         self._base_bath = os.path.dirname(os.path.abspath(__file__))
-        self._left_hand = Image.open(
-            os.path.join(self._base_bath, 'right_hand.png')
+        self.left_hand = Tkinter.PhotoImage(
+            file=os.path.join(self._base_bath, 'left_hand.gif')
         )
-        self._right_hand = Image.open(
-            os.path.join(self._base_bath, 'left_hand.png')
+        self.right_hand = Tkinter.PhotoImage(
+            file=os.path.join(self._base_bath, 'right_hand.gif')
         )
-        self.left_hand = ImageTk.PhotoImage(self._left_hand)
-        self.right_hand = ImageTk.PhotoImage(self._right_hand)
+        self.key_small = Tkinter.PhotoImage(
+            file=os.path.join(self._base_bath, 'key_small.gif')
+        )
 
 
 class EventQueue(object):
@@ -206,13 +206,20 @@ class GuiEventMapper(EventMapper):
         self.unset_button_map(SCButtons.RPAD)
 
 class TkSteamController(SteamController):
-        def __init__(self, evm, events, tk, **kwargs):
+        WIDTH = 800
+        HEIGHT = 300
+        
+        def __init__(self, evm, events, **kwargs):
             self.evm = evm
-            self.tk = tk
+            self.tk = Tkinter.Tk()
+            self.tk.overrideredirect(1)
+            self.tk.configure(background = 'CadetBlue2')
+            self.res = Recources()
             self.quit = False
             self.events = events
             self.visible = False
             super(TkSteamController, self).__init__(**kwargs)
+            self.build_keyboard()
 
 
         def _callbackTimer(self, *args, **kwargs):
@@ -269,26 +276,42 @@ class TkSteamController(SteamController):
                     chars = chars[1:]
                     self.tk.after(10, self.__press_output_key, chars)
 
-        def build_keyboard(self, res):
+        def create_button(self, x, y, text):
+            self.canvas.create_image(x, y, image=self.res.key_small, tags=('button', text))
+            self.canvas.create_text(x, y-10, text=text)
+
+        def build_keyboard(self):
             font = tkFont.Font(family='Helvetica', size=24, weight='bold')
-            output = Tkinter.Entry(self.tk, width=50, font=font, bg="yellow")
+            output = Tkinter.Entry(self.tk, width=50, font=font, bg="AntiqueWhite3")
             output.pack()
-            lf = Tkinter.LabelFrame(self.tk, text=" keypad ", bd=3, bg="green",)
-            lf.pack(padx=15, pady=15)
+            frame = Tkinter.Frame(self.tk)
+            frame.pack()
+            self.canvas = Tkinter.Canvas(
+                frame,
+                bg="AntiqueWhite3",
+                width=self.WIDTH - 80,
+                height=self.HEIGHT - 30
+            )
+            self.canvas.pack()
             for row_nr, row in enumerate(KEYS):
                 for key_nr, key in enumerate(row):
-                    key = Tkinter.Button(
-                        lf,
-                        text=key,
-                        font=font,
-                        bg="blue",
-                        relief='groove'
+                    self.create_button(
+                        32 + key_nr * 60,
+                        32 + row_nr * 60,
+                        text = key
                     )
-                    key.grid(row=row_nr, column=key_nr)
-            right = Tkinter.Label(self.tk, image=res.right_hand)
-            right.pack()
-            left = Tkinter.Label(self.tk, image=res.left_hand)
-            left.pack()
+            self.left_hand = self.canvas.create_image(
+                150,
+                250,
+                image=self.res.left_hand,
+                tags='left_hand'
+            )
+            self.right_hand = self.canvas.create_image(
+                150,
+                250,
+                image=self.res.right_hand,
+                tags='right_hand'
+            )
             self.tk.withdraw()
             self.tk.bind('<<SteamTrigger>>', self.triggerPressed)
             self.tk.bind('<<GuiHide>>', self.guiHide)
@@ -298,21 +321,23 @@ class TkSteamController(SteamController):
             self.tk.bind('<<backspace>>', self.backspace)
 
         def triggerPressed(self, evt):
-            tk_index = 2 if evt.serial % 2 else 3
-            label = self.tk.winfo_children()[tk_index]
-            x = label.winfo_rootx()
-            y = label.winfo_rooty()
             pressed = evt.serial > 2
-            offset = 0 if evt.serial in (1, 3) else 36
-            lf = self.tk.winfo_children()[1]
-            button = _get_widget_by_pos(lf, x, y, offset)
-            if button:
-                if pressed:
-                    button.config(relief='groove')
+            if not pressed:
+                return
+            if evt.serial % 2:
+                # RIGHT Trigger Pressed
+                x, y = self.canvas.coords(self.right_hand)
+                x = x - 5
+            else:
+                x, y = self.canvas.coords(self.left_hand)
+                x = x + 18
+            items = self.canvas.find_overlapping(x, y, x, y)
+            for item in items:
+                tags = self.canvas.gettags(item)
+                if 'button' in tags:
                     output = self.tk.winfo_children()[0]
-                    output.insert('end', button.config('text')[4])
-                else:
-                    button.config(relief='ridge')
+                    output.insert('end', tags[1])
+                    break
 
         def guiHide(self, evt):
             self.tk.withdraw()
@@ -330,9 +355,12 @@ class TkSteamController(SteamController):
             PAD_MAX = 30000
             x = ((x + PAD_MAX) / 60000.) * self.tk.winfo_width()
             y = (1-(y + PAD_MAX) / 60000.) * self.tk.winfo_height()
-            pad_index = 1 if pad == Pos.RIGHT else 2
-            label = self.tk.winfo_children()[pad_index+1]
-            label.place(x=x, y=y)
+            canvas_x = self.canvas.canvasx(x)
+            canvas_y = self.canvas.canvasx(y)
+            if pad == Pos.LEFT:
+                self.canvas.coords(self.left_hand, canvas_x, canvas_y)
+            else:
+                self.canvas.coords(self.right_hand, canvas_x, canvas_y)
 
         def whitespace(self, evt):
             self.tk.winfo_children()[0].insert('end', ' ')
@@ -341,26 +369,14 @@ class TkSteamController(SteamController):
             output = self.tk.winfo_children()[0]
             output.delete(len(output.get())-1, 'end')
 
+
+
 class SCDaemon(Daemon):
     def run(self):
         evm = GuiEventMapper()
         evm.setButtonCallback(SCButtons.STEAM, button_pressed_callback)
         sc = TkSteamController(evm, callback=evm.process)
         sc.run()
-
-
-
-
-def _get_widget_by_pos(parent, x, y, offset):
-    for widget in parent.winfo_children():
-        w_x = widget.winfo_rootx()
-        w_y = widget.winfo_rooty()
-        w_h = widget.winfo_height()
-        w_w = widget.winfo_width()
-        if w_x <= x + offset and w_x + w_w >= x + offset and w_y <= y and w_y + w_h >= y:
-            return widget
-    return None
-
 
 
 
@@ -381,14 +397,7 @@ if __name__ == '__main__':
             daemon.restart()
         elif 'debug' == args.command:
             events = EventQueue()
-            tk = Tkinter.Tk()
-            #tk.overrideredirect(1)
-            tk.configure(background = 'red')
-            res = Recources()
-            #build_keyboard(tk, res)
             evm = GuiEventMapper(events)
-            sc = TkSteamController(evm, events, tk, callback=evm.process)
-            sc.build_keyboard(res)
+            sc = TkSteamController(evm, events, callback=evm.process)
             sc.run()
-            #tk.mainloop()
     _main()
