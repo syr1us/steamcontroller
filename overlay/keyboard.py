@@ -376,7 +376,7 @@ if __name__ == '__main__':
         elif 'debug' == args.command:
             events = EventQueue()
             tk = Tkinter.Tk()
-            tk.overrideredirect(1)
+            #tk.overrideredirect(1)
             res = Recources()
             #build_keyboard(tk, res)
             evm = GuiEventMapper(events)
